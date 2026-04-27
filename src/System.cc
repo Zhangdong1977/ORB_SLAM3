@@ -474,6 +474,10 @@ Sophus::SE3f System::TrackMonocular(const cv::Mat &im, const double &timestamp, 
 }
 
 
+void System::GrabImuData(const IMU::Point &imuMeasurement)
+{
+    mpTracker->GrabImuData(imuMeasurement);
+}
 
 void System::ActivateLocalizationMode()
 {

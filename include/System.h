@@ -120,6 +120,8 @@ public:
     // Returns the camera pose (empty if tracking fails).
     Sophus::SE3f TrackMonocular(const cv::Mat &im, const double &timestamp, const vector<IMU::Point>& vImuMeas = vector<IMU::Point>(), string filename="");
 
+    // IMU数据注入接口，供外部ROS节点直接注入IMU数据
+    void GrabImuData(const IMU::Point &imuMeasurement);
 
     // This stops local mapping thread (map building) and performs only camera tracking.
     void ActivateLocalizationMode();

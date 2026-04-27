@@ -22,6 +22,7 @@
 #include "GeometricTools.h"
 
 #include<iostream>
+#include<cmath>
 
 namespace ORB_SLAM3
 {
@@ -176,6 +177,13 @@ void Preintegrated::Reintegrate()
 
 void Preintegrated::IntegrateNewMeasurement(const Eigen::Vector3f &acceleration, const Eigen::Vector3f &angVel, const float &dt)
 {
+    // Guard against NaN/Inf in input data to prevent SO3::exp crashes
+    if (!std::isfinite(acceleration(0)) || !std::isfinite(acceleration(1)) || !std::isfinite(acceleration(2)) ||
+        !std::isfinite(angVel(0)) || !std::isfinite(angVel(1)) || !std::isfinite(angVel(2)) ||
+        !std::isfinite(dt) || dt <= 0.0f) {
+        std::cout << "IntegrateNewMeasurement: skipping bad measurement (NaN/Inf/zero dt)" << std::endl;
+        return;
+    }
     mvMeasurements.push_back(integrable(acceleration,angVel,dt));
 
     // Position is updated firstly, as it depends on previously computed velocity and rotation.
@@ -285,7 +293,13 @@ Eigen::Matrix3f Preintegrated::GetDeltaRotation(const Bias &b_)
     std::unique_lock<std::mutex> lock(mMutex);
     Eigen::Vector3f dbg;
     dbg << b_.bwx-b.bwx,b_.bwy-b.bwy,b_.bwz-b.bwz;
-    return NormalizeRotation(dR * Sophus::SO3f::exp(JRg * dbg).matrix());
+    Eigen::Vector3f omega = JRg * dbg;
+    // Guard against NaN/Inf to prevent SO3::exp crash
+    if (!std::isfinite(omega(0)) || !std::isfinite(omega(1)) || !std::isfinite(omega(2))) {
+        std::cout << "GetDeltaRotation: NaN detected in omega, returning dR" << std::endl;
+        return dR;
+    }
+    return NormalizeRotation(dR * Sophus::SO3f::exp(omega).matrix());
 }
 
 Eigen::Vector3f Preintegrated::GetDeltaVelocity(const Bias &b_)
@@ -309,7 +323,13 @@ Eigen::Vector3f Preintegrated::GetDeltaPosition(const Bias &b_)
 Eigen::Matrix3f Preintegrated::GetUpdatedDeltaRotation()
 {
     std::unique_lock<std::mutex> lock(mMutex);
-    return NormalizeRotation(dR * Sophus::SO3f::exp(JRg*db.head(3)).matrix());
+    Eigen::Vector3f omega = JRg*db.head(3);
+    // Guard against NaN/Inf to prevent SO3::exp crash
+    if (!std::isfinite(omega(0)) || !std::isfinite(omega(1)) || !std::isfinite(omega(2))) {
+        std::cout << "GetUpdatedDeltaRotation: NaN detected in omega, returning dR" << std::endl;
+        return dR;
+    }
+    return NormalizeRotation(dR * Sophus::SO3f::exp(omega).matrix());
 }
 
 Eigen::Vector3f Preintegrated::GetUpdatedDeltaVelocity()

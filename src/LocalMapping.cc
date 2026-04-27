@@ -1241,14 +1241,27 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
             (*itKF)->mPrevKF->SetVelocity(_vel);
         }
 
-        dirG = dirG/dirG.norm();
+        const float dirG_norm = dirG.norm();
+        if (dirG_norm < 1e-6f) {
+            cout << "dirG norm too small, no IMU motion detected. Skipping IMU init" << endl;
+            bInitializing = false;
+            return;
+        }
+        dirG = dirG / dirG_norm;
         Eigen::Vector3f gI(0.0f, 0.0f, -1.0f);
         Eigen::Vector3f v = gI.cross(dirG);
         const float nv = v.norm();
-        const float cosg = gI.dot(dirG);
-        const float ang = acos(cosg);
-        Eigen::Vector3f vzg = v*ang/nv;
-        Rwg = Sophus::SO3f::exp(vzg).matrix();
+        const float cosg = std::clamp(gI.dot(dirG), -1.0f, 1.0f);
+
+        if (nv < 1e-6f) {
+            // dirG is approximately parallel to gI, no rotation needed
+            // Avoid division by zero in vzg = v*ang/nv
+            Rwg = Eigen::Matrix3f::Identity();
+        } else {
+            const float ang = acos(cosg);
+            Eigen::Vector3f vzg = v*ang/nv;
+            Rwg = Sophus::SO3f::exp(vzg).matrix();
+        }
         mRwg = Rwg.cast<double>();
         mTinit = mpCurrentKeyFrame->mTimeStamp-mFirstTs;
     }
