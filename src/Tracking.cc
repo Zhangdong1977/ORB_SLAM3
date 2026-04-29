@@ -1674,9 +1674,10 @@ void Tracking::PreintegrateIMU()
             usleep(500);
     }
 
-    const int n = mvImuFromLastFrame.size()-1;
-    if(n==0){
+    const int n = (int)mvImuFromLastFrame.size()-1;
+    if(n <= 0){
         cout << "Empty IMU measurements vector!!!\n";
+        mCurrentFrame.setIntegrated();
         return;
     }
 
@@ -1763,6 +1764,10 @@ bool Tracking::PredictStateIMU()
     }
     else if(!mbMapUpdated)
     {
+        if(!mCurrentFrame.mpImuPreintegratedFrame) {
+            Verbose::PrintMess("NULL mpImuPreintegratedFrame, skipping IMU prediction", Verbose::VERBOSITY_NORMAL);
+            return false;
+        }
         const Eigen::Vector3f twb1 = mLastFrame.GetImuPosition();
         const Eigen::Matrix3f Rwb1 = mLastFrame.GetImuRotation();
         const Eigen::Vector3f Vwb1 = mLastFrame.GetVelocity();
@@ -3869,6 +3874,8 @@ void Tracking::ResetActiveMap(bool bLocMap)
     // Clear Map (this erase MapPoints and KeyFrames)
     mpAtlas->clearMap();
 
+    // Reset last frame to avoid dangling MapPoint pointers
+    mLastFrame = Frame();
 
     //KeyFrame::nNextId = mpAtlas->GetLastInitKFid();
     //Frame::nNextId = mnLastInitFrameId;
